@@ -78,9 +78,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 },
                 app::InputMode::Entry => match key.code {
                     KeyCode::Esc => app.exit_input(),
-                    KeyCode::Char('\n') => app.newline(),
+                    KeyCode::Enter => app.newline(),
                     KeyCode::Backspace => app.backspace(),
                     KeyCode::Char(c) => app.input_char(c),
+                    _ => {}
+                },
+                app::InputMode::TabSelect => match key.code {
+                    KeyCode::Esc => app.exit_input(),
+                    KeyCode::Char('h') | KeyCode::Left => app.tab_left(),
+                    KeyCode::Char('l') | KeyCode::Right => app.tab_right(),
+                    KeyCode::Enter => app.tab_select(),
                     _ => {}
                 },
             },

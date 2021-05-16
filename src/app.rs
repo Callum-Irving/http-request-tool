@@ -16,6 +16,7 @@ use tui::{
 #[derive(PartialEq)]
 pub enum InputMode {
     Navigation,
+    TabSelect,
     Entry,
 }
 
@@ -122,6 +123,25 @@ impl App {
         }
 
         // TODO: Trigger special action
+        // Actions:
+        // Tabs
+        // Endpoint entry
+        // JSON entry
+        // Body/header/query tabs
+        // Send button
+        // Method select
+        match self.UI[self.current_pane] {
+            0 => {
+                self.input_mode = InputMode::TabSelect;
+                self.widget_styles[self.UI[self.current_pane]] = Color::Red;
+            }
+            3 => {}
+            4 => {}
+            5 => {}
+            6 => {}
+            7 => {}
+            _ => {}
+        }
     }
 
     pub fn escape(&mut self) {
@@ -184,6 +204,11 @@ impl App {
     pub fn newline(&mut self) {}
     pub fn backspace(&mut self) {}
     pub fn exit_input(&mut self) {}
+
+    // Tab navigation
+    pub fn tab_left(&mut self) {}
+    pub fn tab_right(&mut self) {}
+    pub fn tab_select(&mut self) {}
 
     // Cleanly exit
     pub fn exit(&mut self) {}

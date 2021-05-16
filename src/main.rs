@@ -1,5 +1,6 @@
 mod app;
 use crate::app::App;
+mod ui_graph;
 
 use crossterm::{
     event,
@@ -11,8 +12,13 @@ use std::error::Error;
 use std::io;
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tui::{backend::CrosstermBackend, Terminal};
+
+enum EventType<I> {
+    Input(I),
+    Tick,
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Initialize terminal
@@ -26,12 +32,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Input handling thread
     let (tx, rx) = mpsc::channel();
-    thread::spawn(move || loop {
-        // The timeout doesn't seem to affect anything,
-        // but it consumes a lot of cpu if set to 0 and looped
-        if event::poll(Duration::from_secs(10)).unwrap() {
-            if let event::Event::Key(key) = event::read().unwrap() {
-                tx.send(key).unwrap();
+    let tick_rate = Duration::from_millis(200);
+    thread::spawn(move || {
+        let mut last_tick = Instant::now();
+        loop {
+            let timeout = tick_rate
+                .checked_sub(last_tick.elapsed())
+                .unwrap_or_else(|| Duration::from_secs(0));
+
+            if event::poll(timeout).unwrap() {
+                if let event::Event::Key(key) = event::read().unwrap() {
+                    tx.send(EventType::Input(key)).unwrap();
+                }
+            }
+
+            if last_tick.elapsed() >= tick_rate {
+                if let Ok(_) = tx.send(EventType::Tick) {
+                    last_tick = Instant::now();
+                }
             }
         }
     });
@@ -42,19 +60,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Main drawing loop
     loop {
         // Draw UI
-        app.draw(&mut terminal);
+        app.draw(&mut terminal)?;
 
         // Input handling
-        // For whatever reason, this MUST be after the drawing
-        // I believe it has to do with the fact that this is async
-        match rx.recv()?.code {
-            KeyCode::Char('q') => break,
-            KeyCode::Enter => app.enter(),
-            KeyCode::Char('h') => app.left(),
-            KeyCode::Char('j') => app.down(),
-            KeyCode::Char('k') => app.up(),
-            KeyCode::Char('l') => app.right(),
-            _ => {}
+        match rx.recv()? {
+            EventType::Input(key) => match app.input_mode {
+                app::InputMode::Navigation => match key.code {
+                    KeyCode::Esc => app.escape(),
+                    KeyCode::Char('q') => break,
+                    KeyCode::Enter => app.enter(),
+                    KeyCode::Char('?') => app.help(),
+                    KeyCode::Char('h') | KeyCode::Left => app.left(),
+                    KeyCode::Char('l') | KeyCode::Right => app.right(),
+                    KeyCode::Char('k') | KeyCode::Up => app.up(),
+                    KeyCode::Char('j') | KeyCode::Down => app.down(),
+                    _ => {}
+                },
+                app::InputMode::Entry => match key.code {
+                    KeyCode::Esc => app.exit_input(),
+                    KeyCode::Char('\n') => app.newline(),
+                    KeyCode::Backspace => app.backspace(),
+                    KeyCode::Char(c) => app.input_char(c),
+                    _ => {}
+                },
+            },
+            EventType::Tick => {}
         }
     }
 

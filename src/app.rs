@@ -21,13 +21,13 @@ pub enum InputMode {
 }
 
 pub struct App {
-    tab_count: usize,
+    tabs: Vec<usize>, // This vector holds IDs, not names
     current_tab: usize,
     pub input_mode: InputMode,
     request_body: String,
     response_body: String,
     current_pane: petgraph::graph::NodeIndex,
-    UI: Graph<usize, usize>,
+    ui: Graph<usize, usize>,
     widget_styles: [Color; 8],
 }
 
@@ -38,13 +38,13 @@ impl App {
         let mut widget_styles: [Color; 8] = [Color::Rgb(255, 255, 255); 8];
         widget_styles[0] = Color::Yellow;
         App {
-            tab_count: 1,
+            tabs: vec![0],
             current_tab: 0,
             input_mode: InputMode::Navigation,
             request_body: String::new(),
             response_body: String::new(),
             current_pane: tabs_pane,
-            UI: graph,
+            ui: graph,
             widget_styles,
         }
     }
@@ -62,7 +62,7 @@ impl App {
                 .split(size);
 
             // TODO: Implement tab selection
-            let tab_names = (1..self.tab_count + 1)
+            let tab_names = (1..self.tabs.len() + 1)
                 .map(|num| Spans::from(num.to_string()))
                 .collect();
             let tabs = Tabs::new(tab_names)
@@ -73,7 +73,7 @@ impl App {
                         .borders(Borders::ALL),
                 )
                 .select(self.current_tab)
-                .highlight_style(Style::default().fg(Color::Yellow))
+                .highlight_style(Style::default().fg(Color::Magenta))
                 .divider(symbols::line::VERTICAL);
 
             // Body layout
@@ -99,12 +99,12 @@ impl App {
 
     // Navigation keys
     pub fn enter(&mut self) {
-        let edges = self.UI.edges(self.current_pane);
+        let edges = self.ui.edges(self.current_pane);
         for edge in edges {
             if *edge.weight() == 5 {
-                self.widget_styles[self.UI[self.current_pane]] = Color::Rgb(255, 255, 255);
+                self.widget_styles[self.ui[self.current_pane]] = Color::Rgb(255, 255, 255);
                 self.current_pane = edge.target();
-                self.widget_styles[self.UI[self.current_pane]] = Color::Yellow;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
                 return;
             }
         }
@@ -117,10 +117,10 @@ impl App {
         // Body/header/query tabs
         // Send button
         // Method select
-        match self.UI[self.current_pane] {
+        match self.ui[self.current_pane] {
             0 => {
                 self.input_mode = InputMode::TabSelect;
-                self.widget_styles[self.UI[self.current_pane]] = Color::Red;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Red;
             }
             3 => {}
             4 => {}
@@ -133,56 +133,56 @@ impl App {
 
     // Navigation functions
     pub fn escape(&mut self) {
-        let edges = self.UI.edges(self.current_pane);
+        let edges = self.ui.edges(self.current_pane);
         for edge in edges {
             if *edge.weight() == 6 {
-                self.widget_styles[self.UI[self.current_pane]] = Color::Rgb(255, 255, 255);
+                self.widget_styles[self.ui[self.current_pane]] = Color::Rgb(255, 255, 255);
                 self.current_pane = edge.target();
-                self.widget_styles[self.UI[self.current_pane]] = Color::Yellow;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
             }
         }
     }
 
     pub fn left(&mut self) {
-        let edges = self.UI.edges(self.current_pane);
+        let edges = self.ui.edges(self.current_pane);
         for edge in edges {
             if *edge.weight() == 1 {
-                self.widget_styles[self.UI[self.current_pane]] = Color::Rgb(255, 255, 255);
+                self.widget_styles[self.ui[self.current_pane]] = Color::Rgb(255, 255, 255);
                 self.current_pane = edge.target();
-                self.widget_styles[self.UI[self.current_pane]] = Color::Yellow;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
             }
         }
     }
 
     pub fn right(&mut self) {
-        let edges = self.UI.edges(self.current_pane);
+        let edges = self.ui.edges(self.current_pane);
         for edge in edges {
             if *edge.weight() == 2 {
-                self.widget_styles[self.UI[self.current_pane]] = Color::Rgb(255, 255, 255);
+                self.widget_styles[self.ui[self.current_pane]] = Color::Rgb(255, 255, 255);
                 self.current_pane = edge.target();
-                self.widget_styles[self.UI[self.current_pane]] = Color::Yellow;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
             }
         }
     }
 
     pub fn up(&mut self) {
-        let edges = self.UI.edges(self.current_pane);
+        let edges = self.ui.edges(self.current_pane);
         for edge in edges {
             if *edge.weight() == 3 {
-                self.widget_styles[self.UI[self.current_pane]] = Color::Rgb(255, 255, 255);
+                self.widget_styles[self.ui[self.current_pane]] = Color::Rgb(255, 255, 255);
                 self.current_pane = edge.target();
-                self.widget_styles[self.UI[self.current_pane]] = Color::Yellow;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
             }
         }
     }
 
     pub fn down(&mut self) {
-        let edges = self.UI.edges(self.current_pane);
+        let edges = self.ui.edges(self.current_pane);
         for edge in edges {
             if *edge.weight() == 4 {
-                self.widget_styles[self.UI[self.current_pane]] = Color::Rgb(255, 255, 255);
+                self.widget_styles[self.ui[self.current_pane]] = Color::Rgb(255, 255, 255);
                 self.current_pane = edge.target();
-                self.widget_styles[self.UI[self.current_pane]] = Color::Yellow;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
             }
         }
     }
@@ -193,25 +193,34 @@ impl App {
     pub fn backspace(&mut self) {}
     pub fn exit_input(&mut self) {
         self.input_mode = InputMode::Navigation;
-        self.widget_styles[self.UI[self.current_pane]] = Color::Yellow;
+        self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
     }
 
     // Tab navigation
     pub fn tab_left(&mut self) {
-        self.current_tab -= 1;
+        if self.current_tab > 0 {
+            self.current_tab -= 1;
+        }
     }
     pub fn tab_right(&mut self) {
         self.current_tab += 1;
-        if self.current_tab >= self.tab_count {
-            self.tab_count += 1;
+        if self.current_tab >= self.tabs.len() {
+            let mut i: usize = 0;
+            loop {
+                if !self.tabs.contains(&i) {
+                    self.tabs.push(i);
+                    break;
+                }
+                i += 1;
+            }
         }
     }
     pub fn tab_delete(&mut self) {
-        self.tab_count -= 1;
-        if self.tab_count <= 0 {
-            self.tab_count = 1;
+        self.tabs.remove(self.current_tab);
+        if self.tabs.len() <= 0 {
+            self.tabs.push(0);
         }
-        if self.current_tab >= self.tab_count {
+        if self.current_tab >= self.tabs.len() {
             self.current_tab -= 1;
         }
     }

@@ -46,10 +46,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
 
-            if last_tick.elapsed() >= tick_rate {
-                if tx.send(EventType::Tick).is_ok() {
-                    last_tick = Instant::now();
-                }
+            if last_tick.elapsed() >= tick_rate && tx.send(EventType::Tick).is_ok() {
+                last_tick = Instant::now();
             }
         }
     });

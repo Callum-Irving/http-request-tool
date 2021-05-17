@@ -21,7 +21,7 @@ pub enum InputMode {
 }
 
 pub struct App {
-    tabs: Vec<String>,
+    tab_count: usize,
     current_tab: usize,
     pub input_mode: InputMode,
     request_body: String,
@@ -35,18 +35,10 @@ impl App {
     pub fn new() -> App {
         let graph = ui_graph::init_ui_graph();
         let tabs_pane = graph.node_indices().find(|node| graph[*node] == 0).unwrap();
-        let widget_styles: [Color; 8] = [
-            Color::Yellow,
-            Color::Rgb(255, 255, 255),
-            Color::Rgb(255, 255, 255),
-            Color::Rgb(255, 255, 255),
-            Color::Rgb(255, 255, 255),
-            Color::Rgb(255, 255, 255),
-            Color::Rgb(255, 255, 255),
-            Color::Rgb(255, 255, 255),
-        ];
+        let mut widget_styles: [Color; 8] = [Color::Rgb(255, 255, 255); 8];
+        widget_styles[0] = Color::Yellow;
         App {
-            tabs: vec!["1".to_string()],
+            tab_count: 1,
             current_tab: 0,
             input_mode: InputMode::Navigation,
             request_body: String::new(),
@@ -70,13 +62,8 @@ impl App {
                 .split(size);
 
             // TODO: Implement tab selection
-            let tab_names = self
-                .tabs
-                .iter()
-                .map(|f| {
-                    let value = f.clone();
-                    Spans::from(value)
-                })
+            let tab_names = (1..self.tab_count + 1)
+                .map(|num| Spans::from(num.to_string()))
                 .collect();
             let tabs = Tabs::new(tab_names)
                 .block(
@@ -144,6 +131,7 @@ impl App {
         }
     }
 
+    // Navigation functions
     pub fn escape(&mut self) {
         let edges = self.UI.edges(self.current_pane);
         for edge in edges {
@@ -203,12 +191,30 @@ impl App {
     pub fn input_char(&mut self, c: char) {}
     pub fn newline(&mut self) {}
     pub fn backspace(&mut self) {}
-    pub fn exit_input(&mut self) {}
+    pub fn exit_input(&mut self) {
+        self.input_mode = InputMode::Navigation;
+        self.widget_styles[self.UI[self.current_pane]] = Color::Yellow;
+    }
 
     // Tab navigation
-    pub fn tab_left(&mut self) {}
-    pub fn tab_right(&mut self) {}
-    pub fn tab_select(&mut self) {}
+    pub fn tab_left(&mut self) {
+        self.current_tab -= 1;
+    }
+    pub fn tab_right(&mut self) {
+        self.current_tab += 1;
+        if self.current_tab >= self.tab_count {
+            self.tab_count += 1;
+        }
+    }
+    pub fn tab_delete(&mut self) {
+        self.tab_count -= 1;
+        if self.tab_count <= 0 {
+            self.tab_count = 1;
+        }
+        if self.current_tab >= self.tab_count {
+            self.current_tab -= 1;
+        }
+    }
 
     // Cleanly exit
     pub fn exit(&mut self) {}

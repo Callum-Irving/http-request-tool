@@ -84,10 +84,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                     _ => {}
                 },
                 app::InputMode::TabSelect => match key.code {
+                    KeyCode::Char('q') => break,
                     KeyCode::Esc => app.exit_input(),
                     KeyCode::Char('h') | KeyCode::Left => app.tab_left(),
                     KeyCode::Char('l') | KeyCode::Right => app.tab_right(),
-                    KeyCode::Enter => app.tab_select(),
+                    KeyCode::Backspace | KeyCode::Delete => app.tab_delete(),
                     _ => {}
                 },
             },

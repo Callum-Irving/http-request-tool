@@ -1,6 +1,5 @@
 use crate::ui_graph;
 use petgraph::{graph::Graph, visit::EdgeRef};
-use reqwest;
 use std::error::Error;
 use std::io::Stdout;
 use tui::{
@@ -18,13 +17,18 @@ pub enum InputMode {
     Navigation,
     TabSelect,
     Entry,
+    EndpointEntry,
+    BodyHeaderSelect,
+    MethodSelect,
 }
 
 pub struct App {
     tabs: Vec<usize>, // This vector holds IDs, not names
     current_tab: usize,
     pub input_mode: InputMode,
-    request_body: String,
+    request_body: Vec<String>,
+    cursor_pos: (usize, usize),
+    endpoint: String,
     response_body: String,
     current_pane: petgraph::graph::NodeIndex,
     ui: Graph<usize, usize>,
@@ -41,7 +45,9 @@ impl App {
             tabs: vec![0],
             current_tab: 0,
             input_mode: InputMode::Navigation,
-            request_body: String::new(),
+            request_body: vec!["{".to_string(), "  ".to_string(), "}".to_string()],
+            cursor_pos: (1, 2),
+            endpoint: String::from("http://"),
             response_body: String::new(),
             current_pane: tabs_pane,
             ui: graph,
@@ -77,7 +83,7 @@ impl App {
                 .divider(symbols::line::VERTICAL);
 
             // Body layout
-            let body = Layout::default()
+            let body_layout = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
                 .split(chunks[1]);
@@ -90,48 +96,211 @@ impl App {
                 .style(Style::default().fg(self.widget_styles[2]))
                 .borders(Borders::ALL);
 
+            // Request block layout
+            let request_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(3),
+                    Constraint::Length(3),
+                    Constraint::Min(2),
+                    Constraint::Length(3),
+                ])
+                .margin(2)
+                .split(body_layout[0]);
+
+            let endpoint_entry = Paragraph::new(Spans::from(self.endpoint.clone())).block(
+                Block::default()
+                    .title("Endpoint")
+                    .style(Style::default().fg(self.widget_styles[3]))
+                    .borders(Borders::ALL),
+            );
+
+            let body_header_options = vec![
+                Spans::from("BODY"),
+                Spans::from("HEADER"),
+                Spans::from("QUERY"),
+            ];
+            let body_header_select = Tabs::new(body_header_options)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(self.widget_styles[4])),
+                )
+                .divider(symbols::line::VERTICAL);
+
+            let lines: Vec<Spans> = self
+                .request_body
+                .iter()
+                .map(|s| Spans::from(s.clone()))
+                .collect();
+            let request_entry = Paragraph::new(lines).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .style(Style::default().fg(self.widget_styles[5])),
+            );
+
+            let request_bottom_layout = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(1), Constraint::Length(6)])
+                .split(request_layout[3]);
+
+            let methods = vec![
+                Spans::from("GET"),
+                Spans::from("POST"),
+                Spans::from("PUT"),
+                Spans::from("DELETE"),
+            ];
+            let method_select = Tabs::new(methods)
+                .block(Block::default().borders(Borders::ALL))
+                .style(Style::default().fg(self.widget_styles[6]))
+                .divider(symbols::line::VERTICAL);
+
+            let send_button = Paragraph::new(Spans::from("SEND")).block(
+                Block::default()
+                    .style(Style::default().fg(self.widget_styles[7]))
+                    .borders(Borders::ALL),
+            );
+
+            match self.input_mode {
+                InputMode::Entry => {
+                    frame.set_cursor(
+                        // Put cursor past the end of the input text
+                        request_layout[2].x + self.cursor_pos.1 as u16 + 1,
+                        // Move one line down, from the border to the input line
+                        request_layout[2].y + self.cursor_pos.0 as u16 + 1,
+                    )
+                }
+                InputMode::EndpointEntry => frame.set_cursor(
+                    request_layout[0].x + self.endpoint.len() as u16 + 1,
+                    request_layout[0].y + 1,
+                ),
+                _ => {}
+            }
+
             frame.render_widget(tabs, chunks[0]);
-            frame.render_widget(response_block, body[1]);
-            frame.render_widget(request_block, body[0]);
+            frame.render_widget(request_block, body_layout[0]);
+            frame.render_widget(response_block, body_layout[1]);
+            frame.render_widget(endpoint_entry, request_layout[0]);
+            frame.render_widget(body_header_select, request_layout[1]);
+            frame.render_widget(method_select, request_bottom_layout[0]);
+            frame.render_widget(send_button, request_bottom_layout[1]);
+            frame.render_widget(request_entry, request_layout[2]);
         })?;
         Ok(())
     }
 
-    // Navigation keys
-    pub fn enter(&mut self) {
-        let edges = self.ui.edges(self.current_pane);
-        for edge in edges {
-            if *edge.weight() == 5 {
-                self.widget_styles[self.ui[self.current_pane]] = Color::Rgb(255, 255, 255);
-                self.current_pane = edge.target();
-                self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
-                return;
-            }
+    // Text entry
+    pub fn input_char(&mut self, c: char) {
+        if self.request_body[self.cursor_pos.0].len() >= self.cursor_pos.1 {
+            self.request_body[self.cursor_pos.0].push(c);
+        } else {
+            self.request_body[self.cursor_pos.0].insert(self.cursor_pos.1 + 1, c);
         }
-
-        // TODO: Trigger special action
-        // Actions:
-        // Tabs
-        // Endpoint entry
-        // JSON entry
-        // Body/header/query tabs
-        // Send button
-        // Method select
-        match self.ui[self.current_pane] {
-            0 => {
-                self.input_mode = InputMode::TabSelect;
-                self.widget_styles[self.ui[self.current_pane]] = Color::Red;
-            }
-            3 => {}
-            4 => {}
-            5 => {}
-            6 => {}
-            7 => {}
-            _ => {}
+        self.cursor_pos.1 += 1;
+    }
+    pub fn newline(&mut self) {
+        // TODO: read indent of line above
+        self.request_body
+            .insert(self.cursor_pos.0 + 1, "  ".to_string());
+        self.cursor_pos.0 += 1;
+        self.cursor_pos.1 = 2;
+    }
+    pub fn input_tab(&mut self) {}
+    pub fn backspace(&mut self) {}
+    pub fn exit_input(&mut self) {
+        self.input_mode = InputMode::Navigation;
+        self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
+    }
+    pub fn entry_left(&mut self) {
+        if self.cursor_pos.1 > 0 {
+            self.cursor_pos.1 -= 1;
+        }
+    }
+    pub fn entry_right(&mut self) {
+        if self.request_body[self.cursor_pos.0].len() > self.cursor_pos.1 {
+            self.cursor_pos.1 += 1;
+        }
+    }
+    pub fn entry_up(&mut self) {
+        if self.cursor_pos.0 > 0 {
+            self.cursor_pos.0 -= 1;
+        }
+        if self.cursor_pos.1 > self.request_body[self.cursor_pos.0].len() {
+            self.cursor_pos.1 = self.request_body[self.cursor_pos.0].len();
+        }
+    }
+    pub fn entry_down(&mut self) {
+        if self.request_body.len() > self.cursor_pos.0 + 1 {
+            self.cursor_pos.0 += 1;
+        }
+        if self.cursor_pos.1 > self.request_body[self.cursor_pos.0].len() {
+            self.cursor_pos.1 = self.request_body[self.cursor_pos.0].len();
         }
     }
 
-    // Navigation functions
+    // Tab navigation
+    pub fn tab_left(&mut self) {
+        if self.current_tab > 0 {
+            self.current_tab -= 1;
+        }
+    }
+    pub fn tab_right(&mut self) {
+        self.current_tab += 1;
+        if self.current_tab >= self.tabs.len() {
+            let mut i: usize = 0;
+            loop {
+                if !self.tabs.contains(&i) {
+                    self.tabs.push(i);
+                    break;
+                }
+                i += 1;
+            }
+        }
+    }
+    pub fn tab_delete(&mut self) {
+        self.tabs.remove(self.current_tab);
+        if self.tabs.len() <= 0 {
+            self.tabs.push(0);
+        }
+        if self.current_tab >= self.tabs.len() {
+            self.current_tab -= 1;
+        }
+    }
+
+    // Cleanly exit
+    pub fn exit(&mut self) {}
+
+    // Open help menu
+    pub fn help(&self) {}
+
+    // Async functions to send http requests
+    //async fn http_get(&mut self) {
+    //// Get data from text boxes
+    //let endpoint = "http://google.com/";
+    //let body = "{ json: yes }";
+
+    //// Send request
+    //let client = reqwest::Client::new();
+    //let response = client.post(endpoint).body(body).send().await;
+
+    //// Change response field
+    //match response {
+    //Ok(response) => {
+    //// Everything worked
+    //}
+    //Err(_) => {
+    //// Display error message
+    //}
+    //}
+    //}
+    //async fn http_post(&self) {}
+    //async fn http_put(&self) {}
+    //async fn http_delete(&self) {}
+    //async fn send_request(&self) {}
+}
+
+// Navigation functions
+impl App {
     pub fn escape(&mut self) {
         let edges = self.ui.edges(self.current_pane);
         for edge in edges {
@@ -187,71 +356,62 @@ impl App {
         }
     }
 
-    // Text entry
-    pub fn input_char(&mut self, c: char) {}
-    pub fn newline(&mut self) {}
-    pub fn backspace(&mut self) {}
-    pub fn exit_input(&mut self) {
-        self.input_mode = InputMode::Navigation;
-        self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
-    }
-
-    // Tab navigation
-    pub fn tab_left(&mut self) {
-        if self.current_tab > 0 {
-            self.current_tab -= 1;
-        }
-    }
-    pub fn tab_right(&mut self) {
-        self.current_tab += 1;
-        if self.current_tab >= self.tabs.len() {
-            let mut i: usize = 0;
-            loop {
-                if !self.tabs.contains(&i) {
-                    self.tabs.push(i);
-                    break;
-                }
-                i += 1;
+    pub fn enter(&mut self) {
+        let edges = self.ui.edges(self.current_pane);
+        for edge in edges {
+            if *edge.weight() == 5 {
+                self.widget_styles[self.ui[self.current_pane]] = Color::Rgb(255, 255, 255);
+                self.current_pane = edge.target();
+                self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
+                return;
             }
         }
-    }
-    pub fn tab_delete(&mut self) {
-        self.tabs.remove(self.current_tab);
-        if self.tabs.len() <= 0 {
-            self.tabs.push(0);
-        }
-        if self.current_tab >= self.tabs.len() {
-            self.current_tab -= 1;
-        }
-    }
 
-    // Cleanly exit
-    pub fn exit(&mut self) {}
-
-    // Open help menu
-    pub fn help(&self) {}
-
-    // Async functions to send http requests
-    async fn http_get(&mut self) {
-        // Get data from text boxes
-        let endpoint = "http://google.com/";
-        let body = "{ json: yes }";
-
-        // Send request
-        let client = reqwest::Client::new();
-        let response = client.post(endpoint).body(body).send().await;
-
-        // Change response field
-        match response {
-            Ok(response) => {
-                // Everything worked
+        // TODO: Trigger special action
+        // Actions:
+        // Tabs
+        // Endpoint entry
+        // Body/header/query tabs
+        // JSON entry
+        // Send button
+        // Method select
+        match self.ui[self.current_pane] {
+            0 => {
+                self.input_mode = InputMode::TabSelect;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Red;
             }
-            Err(_) => {
-                // Display error message
+            3 => {
+                self.input_mode = InputMode::EndpointEntry;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Red;
             }
+            4 => {
+                self.input_mode = InputMode::BodyHeaderSelect;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Red;
+            }
+            5 => {
+                self.input_mode = InputMode::Entry;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Red;
+            }
+            6 => {
+                // Send request
+            }
+            7 => {
+                self.input_mode = InputMode::MethodSelect;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Red;
+            }
+            _ => {}
         }
     }
-    async fn http_post(&self) {}
-    async fn http_put(&self) {}
-    async fn http_delete(&self) {}
+}
+
+// Endpoint entry
+// TODO: Show cursor
+impl App {
+    pub fn endpoint_input_char(&mut self, c: char) {
+        self.endpoint.push(c);
+    }
+
+    pub fn endpoint_backspace(&mut self) {
+        self.endpoint.pop();
+    }
 }

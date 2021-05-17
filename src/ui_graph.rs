@@ -37,7 +37,6 @@ pub fn init_ui_graph() -> Graph<usize, usize> {
     // Endpoint entry
     graph.add_edge(indices[3], indices[1], 6);
     graph.add_edge(indices[3], indices[4], 4);
-    graph.add_edge(indices[3], indices[6], 2);
     // Body/header/query select
     graph.add_edge(indices[4], indices[1], 6);
     graph.add_edge(indices[4], indices[3], 3);
@@ -45,13 +44,14 @@ pub fn init_ui_graph() -> Graph<usize, usize> {
     // Paragraph entry
     graph.add_edge(indices[5], indices[1], 6);
     graph.add_edge(indices[5], indices[4], 3);
+    graph.add_edge(indices[5], indices[6], 4);
     // Method select
-    graph.add_edge(indices[6], indices[3], 1);
+    graph.add_edge(indices[6], indices[5], 3);
     graph.add_edge(indices[6], indices[7], 2);
     graph.add_edge(indices[6], indices[1], 6);
     // Send request button
     graph.add_edge(indices[7], indices[6], 1);
-    graph.add_edge(indices[7], indices[4], 4);
+    graph.add_edge(indices[7], indices[5], 3);
     graph.add_edge(indices[7], indices[1], 6);
 
     graph

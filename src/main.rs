@@ -80,6 +80,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                     KeyCode::Esc => app.exit_input(),
                     KeyCode::Enter => app.newline(),
                     KeyCode::Backspace => app.backspace(),
+                    KeyCode::Tab => app.input_tab(),
+                    KeyCode::Left => app.entry_left(),
+                    KeyCode::Right => app.entry_right(),
+                    KeyCode::Up => app.entry_up(),
+                    KeyCode::Down => app.entry_down(),
                     KeyCode::Char(c) => app.input_char(c),
                     _ => {}
                 },
@@ -91,6 +96,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                     KeyCode::Backspace | KeyCode::Delete => app.tab_delete(),
                     _ => {}
                 },
+                app::InputMode::EndpointEntry => match key.code {
+                    KeyCode::Esc => app.exit_input(),
+                    KeyCode::Enter => app.exit_input(),
+                    KeyCode::Backspace => app.endpoint_backspace(),
+                    KeyCode::Char(c) => app.endpoint_input_char(c),
+                    _ => {}
+                },
+                app::InputMode::BodyHeaderSelect => {}
+                app::InputMode::MethodSelect => {}
             },
             EventType::Tick => {}
         }

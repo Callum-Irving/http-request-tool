@@ -1,3 +1,5 @@
+mod text_entry;
+
 use crate::ui_graph;
 use petgraph::{graph::Graph, visit::EdgeRef};
 use std::error::Error;
@@ -11,6 +13,8 @@ use tui::{
     widgets::{Block, Borders, Paragraph, Tabs},
     Terminal,
 };
+
+use self::text_entry::TextEntry;
 
 #[derive(PartialEq)]
 pub enum InputMode {
@@ -26,12 +30,11 @@ pub struct App {
     tabs: Vec<usize>, // This vector holds IDs, not names
     current_tab: usize,
     pub input_mode: InputMode,
-    request_body: Vec<String>,
-    cursor_pos: (usize, usize),
-    endpoint: String,
     response_body: String,
     current_pane: petgraph::graph::NodeIndex,
     ui: Graph<usize, usize>,
+    endpoint_widget: TextEntry,
+    request_widget: TextEntry,
     widget_styles: [Color; 8],
 }
 
@@ -45,12 +48,11 @@ impl App {
             tabs: vec![0],
             current_tab: 0,
             input_mode: InputMode::Navigation,
-            request_body: vec!["{".to_string(), "  ".to_string(), "}".to_string()],
-            cursor_pos: (1, 2),
-            endpoint: String::from("http://"),
             response_body: String::new(),
             current_pane: tabs_pane,
             ui: graph,
+            endpoint_widget: TextEntry::new("http://".to_string(), false),
+            request_widget: TextEntry::new("".to_string(), true),
             widget_styles,
         }
     }
@@ -108,12 +110,7 @@ impl App {
                 .margin(2)
                 .split(body_layout[0]);
 
-            let endpoint_entry = Paragraph::new(Spans::from(self.endpoint.clone())).block(
-                Block::default()
-                    .title("Endpoint")
-                    .style(Style::default().fg(self.widget_styles[3]))
-                    .borders(Borders::ALL),
-            );
+            let endpoint_entry = self.endpoint_widget.get_widget(self.widget_styles[3]);
 
             let body_header_options = vec![
                 Spans::from("BODY"),
@@ -128,16 +125,7 @@ impl App {
                 )
                 .divider(symbols::line::VERTICAL);
 
-            let lines: Vec<Spans> = self
-                .request_body
-                .iter()
-                .map(|s| Spans::from(s.clone()))
-                .collect();
-            let request_entry = Paragraph::new(lines).block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .style(Style::default().fg(self.widget_styles[5])),
-            );
+            let request_entry = self.request_widget.get_widget(self.widget_styles[5]);
 
             let request_bottom_layout = Layout::default()
                 .direction(Direction::Horizontal)
@@ -163,17 +151,13 @@ impl App {
 
             match self.input_mode {
                 InputMode::Entry => {
-                    frame.set_cursor(
-                        // Put cursor past the end of the input text
-                        request_layout[2].x + self.cursor_pos.1 as u16 + 1,
-                        // Move one line down, from the border to the input line
-                        request_layout[2].y + self.cursor_pos.0 as u16 + 1,
-                    )
+                    let (x, y) = self.request_widget.get_cursor_xy();
+                    frame.set_cursor(request_layout[2].x + x + 1, request_layout[2].y + y + 1)
                 }
-                InputMode::EndpointEntry => frame.set_cursor(
-                    request_layout[0].x + self.endpoint.len() as u16 + 1,
-                    request_layout[0].y + 1,
-                ),
+                InputMode::EndpointEntry => {
+                    let (x, _) = self.endpoint_widget.get_cursor_xy();
+                    frame.set_cursor(request_layout[0].x + x + 1, request_layout[0].y + 1)
+                }
                 _ => {}
             }
 
@@ -187,55 +171,6 @@ impl App {
             frame.render_widget(request_entry, request_layout[2]);
         })?;
         Ok(())
-    }
-
-    // Text entry
-    pub fn input_char(&mut self, c: char) {
-        if self.request_body[self.cursor_pos.0].len() >= self.cursor_pos.1 {
-            self.request_body[self.cursor_pos.0].push(c);
-        } else {
-            self.request_body[self.cursor_pos.0].insert(self.cursor_pos.1 + 1, c);
-        }
-        self.cursor_pos.1 += 1;
-    }
-    pub fn newline(&mut self) {
-        // TODO: read indent of line above
-        self.request_body
-            .insert(self.cursor_pos.0 + 1, "  ".to_string());
-        self.cursor_pos.0 += 1;
-        self.cursor_pos.1 = 2;
-    }
-    pub fn input_tab(&mut self) {}
-    pub fn backspace(&mut self) {}
-    pub fn exit_input(&mut self) {
-        self.input_mode = InputMode::Navigation;
-        self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
-    }
-    pub fn entry_left(&mut self) {
-        if self.cursor_pos.1 > 0 {
-            self.cursor_pos.1 -= 1;
-        }
-    }
-    pub fn entry_right(&mut self) {
-        if self.request_body[self.cursor_pos.0].len() > self.cursor_pos.1 {
-            self.cursor_pos.1 += 1;
-        }
-    }
-    pub fn entry_up(&mut self) {
-        if self.cursor_pos.0 > 0 {
-            self.cursor_pos.0 -= 1;
-        }
-        if self.cursor_pos.1 > self.request_body[self.cursor_pos.0].len() {
-            self.cursor_pos.1 = self.request_body[self.cursor_pos.0].len();
-        }
-    }
-    pub fn entry_down(&mut self) {
-        if self.request_body.len() > self.cursor_pos.0 + 1 {
-            self.cursor_pos.0 += 1;
-        }
-        if self.cursor_pos.1 > self.request_body[self.cursor_pos.0].len() {
-            self.cursor_pos.1 = self.request_body[self.cursor_pos.0].len();
-        }
     }
 
     // Tab navigation
@@ -269,9 +204,6 @@ impl App {
 
     // Cleanly exit
     pub fn exit(&mut self) {}
-
-    // Open help menu
-    pub fn help(&self) {}
 
     // Async functions to send http requests
     //async fn http_get(&mut self) {
@@ -405,13 +337,50 @@ impl App {
 }
 
 // Endpoint entry
-// TODO: Show cursor
 impl App {
     pub fn endpoint_input_char(&mut self, c: char) {
-        self.endpoint.push(c);
+        self.endpoint_widget.input_char(c);
     }
 
     pub fn endpoint_backspace(&mut self) {
-        self.endpoint.pop();
+        self.endpoint_widget.backspace();
+    }
+
+    // TODO: Implement left/right cursor movement
+}
+
+// Entry mode
+impl App {
+    pub fn exit_input(&mut self) {
+        self.input_mode = InputMode::Navigation;
+        self.widget_styles[self.ui[self.current_pane]] = Color::Yellow;
+    }
+
+    pub fn backspace(&mut self) {
+        self.request_widget.backspace();
+    }
+
+    pub fn input_tab(&mut self) {
+        self.request_widget.input_tab();
+    }
+
+    pub fn entry_left(&mut self) {
+        self.request_widget.cursor_left();
+    }
+
+    pub fn entry_right(&mut self) {
+        self.request_widget.cursor_right();
+    }
+
+    pub fn entry_up(&mut self) {
+        self.request_widget.cursor_up();
+    }
+
+    pub fn entry_down(&mut self) {
+        self.request_widget.cursor_down();
+    }
+
+    pub fn input_char(&mut self, c: char) {
+        self.request_widget.input_char(c);
     }
 }

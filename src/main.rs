@@ -69,7 +69,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     KeyCode::Esc => app.escape(),
                     KeyCode::Char('q') => break,
                     KeyCode::Enter => app.enter(),
-                    KeyCode::Char('?') => app.help(),
                     KeyCode::Char('h') | KeyCode::Left => app.left(),
                     KeyCode::Char('l') | KeyCode::Right => app.right(),
                     KeyCode::Char('k') | KeyCode::Up => app.up(),
@@ -78,7 +77,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 },
                 app::InputMode::Entry => match key.code {
                     KeyCode::Esc => app.exit_input(),
-                    KeyCode::Enter => app.newline(),
+                    KeyCode::Enter => app.input_char('\n'), // TODO: try removing this line
                     KeyCode::Backspace => app.backspace(),
                     KeyCode::Tab => app.input_tab(),
                     KeyCode::Left => app.entry_left(),

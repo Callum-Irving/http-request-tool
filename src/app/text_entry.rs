@@ -26,7 +26,7 @@ impl TextEntry {
             .split('\n')
             .collect::<Vec<&str>>()
             .iter()
-            .map(|s| Spans::from((*s).clone()))
+            .map(|s| Spans::from(s.clone()))
             .collect();
         Paragraph::new(lines).block(
             Block::default()

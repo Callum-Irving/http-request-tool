@@ -165,7 +165,7 @@ impl App {
                 .split('\n')
                 .collect::<Vec<&str>>()
                 .iter()
-                .map(|s| Spans::from(s.clone()))
+                .map(|s| Spans::from((*s).clone()))
                 .collect();
             let response_paragraph = Paragraph::new(response_lines).block(
                 Block::default()
@@ -220,7 +220,7 @@ impl App {
     }
     pub fn tab_delete(&mut self) {
         self.tabs.remove(self.current_tab);
-        if self.tabs.len() <= 0 {
+        if self.tabs.len() == 0 {
             self.tabs.push(0);
         }
         if self.current_tab >= self.tabs.len() {

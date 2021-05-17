@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
 
             if last_tick.elapsed() >= tick_rate {
-                if let Ok(_) = tx.send(EventType::Tick) {
+                if tx.send(EventType::Tick).is_ok() {
                     last_tick = Instant::now();
                 }
             }
@@ -102,18 +102,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                     KeyCode::Char(c) => app.endpoint_input_char(c),
                     _ => {}
                 },
-                app::InputMode::BodyHeaderSelect => match key.code {
-                    KeyCode::Esc => app.exit_input(),
-                    _ => {}
-                },
-                app::InputMode::MethodSelect => match key.code {
-                    KeyCode::Esc => app.exit_input(),
-                    _ => {}
-                },
-                app::InputMode::ResponseSelect => match key.code {
-                    KeyCode::Esc => app.exit_input(),
-                    _ => {}
-                },
+                app::InputMode::BodyHeaderSelect => {
+                    if key.code == KeyCode::Esc {
+                        app.exit_input();
+                    }
+                }
+                app::InputMode::MethodSelect => {
+                    if key.code == KeyCode::Esc {
+                        app.exit_input();
+                    }
+                }
+                app::InputMode::ResponseSelect => {
+                    if key.code == KeyCode::Esc {
+                        app.exit_input();
+                    }
+                }
             },
             EventType::Tick => {}
         }

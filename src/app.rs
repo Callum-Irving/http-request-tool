@@ -15,6 +15,7 @@ use tui::{
 };
 
 use self::text_entry::TextEntry;
+use crate::ui_graph::pane_identifiers::*;
 
 #[derive(PartialEq)]
 pub enum InputMode {
@@ -24,6 +25,7 @@ pub enum InputMode {
     EndpointEntry,
     BodyHeaderSelect,
     MethodSelect,
+    ResponseSelect,
 }
 
 pub struct App {
@@ -77,7 +79,7 @@ impl App {
                 .block(
                     Block::default()
                         .title("Tabs")
-                        .style(Style::default().fg(self.widget_styles[0]))
+                        .style(Style::default().fg(self.widget_styles[PANE_TABS]))
                         .borders(Borders::ALL),
                 )
                 .select(self.current_tab)
@@ -89,16 +91,9 @@ impl App {
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
                 .split(chunks[1]);
-            let request_block = Block::default()
-                .title("Request")
-                .style(Style::default().fg(self.widget_styles[1]))
-                .borders(Borders::ALL);
-            let response_block = Block::default()
-                .title("Response")
-                .style(Style::default().fg(self.widget_styles[2]))
-                .borders(Borders::ALL);
 
-            // Request block layout
+            // ===== REQUEST BLOCK LAYOUT =====
+
             let request_layout = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
@@ -107,10 +102,11 @@ impl App {
                     Constraint::Min(2),
                     Constraint::Length(3),
                 ])
-                .margin(2)
                 .split(body_layout[0]);
 
-            let endpoint_entry = self.endpoint_widget.get_widget(self.widget_styles[3]);
+            let endpoint_entry = self
+                .endpoint_widget
+                .get_widget(self.widget_styles[PANE_ENDPOINT]);
 
             let body_header_options = vec![
                 Spans::from("BODY"),
@@ -121,11 +117,13 @@ impl App {
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .style(Style::default().fg(self.widget_styles[4])),
+                        .style(Style::default().fg(self.widget_styles[PANE_BODY_HEADER_SELECT])),
                 )
                 .divider(symbols::line::VERTICAL);
 
-            let request_entry = self.request_widget.get_widget(self.widget_styles[5]);
+            let request_entry = self
+                .request_widget
+                .get_widget(self.widget_styles[PANE_REQUEST_ENTRY]);
 
             let request_bottom_layout = Layout::default()
                 .direction(Direction::Horizontal)
@@ -140,14 +138,42 @@ impl App {
             ];
             let method_select = Tabs::new(methods)
                 .block(Block::default().borders(Borders::ALL))
-                .style(Style::default().fg(self.widget_styles[6]))
+                .style(Style::default().fg(self.widget_styles[PANE_METHOD_SELECT]))
                 .divider(symbols::line::VERTICAL);
 
             let send_button = Paragraph::new(Spans::from("SEND")).block(
                 Block::default()
-                    .style(Style::default().fg(self.widget_styles[7]))
+                    .style(Style::default().fg(self.widget_styles[PANE_SEND_BUTTON]))
                     .borders(Borders::ALL),
             );
+
+            // ===== RESPONSE BLOCK LAYOUT =====
+
+            let response_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(3), Constraint::Min(1)])
+                .split(body_layout[1]);
+
+            let response_tabs_names = vec![Spans::from("BODY"), Spans::from("HEADER")];
+            let response_tabs = Tabs::new(response_tabs_names)
+                .block(Block::default().borders(Borders::ALL))
+                .style(Style::default().fg(self.widget_styles[PANE_RESPONSE_TABS]))
+                .divider(symbols::line::VERTICAL);
+
+            let response_lines: Vec<Spans> = self
+                .response_body
+                .split('\n')
+                .collect::<Vec<&str>>()
+                .iter()
+                .map(|s| Spans::from(s.clone()))
+                .collect();
+            let response_paragraph = Paragraph::new(response_lines).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .style(Style::default().fg(self.widget_styles[PANE_RESPONSE_TEXT])),
+            );
+
+            // ===== CURSOR DRAWING =====
 
             match self.input_mode {
                 InputMode::Entry => {
@@ -162,8 +188,8 @@ impl App {
             }
 
             frame.render_widget(tabs, chunks[0]);
-            frame.render_widget(request_block, body_layout[0]);
-            frame.render_widget(response_block, body_layout[1]);
+            frame.render_widget(response_tabs, response_layout[0]);
+            frame.render_widget(response_paragraph, response_layout[1]);
             frame.render_widget(endpoint_entry, request_layout[0]);
             frame.render_widget(body_header_select, request_layout[1]);
             frame.render_widget(method_select, request_bottom_layout[0]);
@@ -308,27 +334,31 @@ impl App {
         // Send button
         // Method select
         match self.ui[self.current_pane] {
-            0 => {
+            PANE_TABS => {
                 self.input_mode = InputMode::TabSelect;
                 self.widget_styles[self.ui[self.current_pane]] = Color::Red;
             }
-            3 => {
+            PANE_ENDPOINT => {
                 self.input_mode = InputMode::EndpointEntry;
                 self.widget_styles[self.ui[self.current_pane]] = Color::Red;
             }
-            4 => {
+            PANE_BODY_HEADER_SELECT => {
                 self.input_mode = InputMode::BodyHeaderSelect;
                 self.widget_styles[self.ui[self.current_pane]] = Color::Red;
             }
-            5 => {
+            PANE_REQUEST_ENTRY => {
                 self.input_mode = InputMode::Entry;
                 self.widget_styles[self.ui[self.current_pane]] = Color::Red;
             }
-            6 => {
+            PANE_SEND_BUTTON => {
                 // Send request
             }
-            7 => {
+            PANE_METHOD_SELECT => {
                 self.input_mode = InputMode::MethodSelect;
+                self.widget_styles[self.ui[self.current_pane]] = Color::Red;
+            }
+            PANE_RESPONSE_TABS => {
+                self.input_mode = InputMode::ResponseSelect;
                 self.widget_styles[self.ui[self.current_pane]] = Color::Red;
             }
             _ => {}

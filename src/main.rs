@@ -102,8 +102,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                     KeyCode::Char(c) => app.endpoint_input_char(c),
                     _ => {}
                 },
-                app::InputMode::BodyHeaderSelect => {}
-                app::InputMode::MethodSelect => {}
+                app::InputMode::BodyHeaderSelect => match key.code {
+                    KeyCode::Esc => app.exit_input(),
+                    _ => {}
+                },
+                app::InputMode::MethodSelect => match key.code {
+                    KeyCode::Esc => app.exit_input(),
+                    _ => {}
+                },
+                app::InputMode::ResponseSelect => match key.code {
+                    KeyCode::Esc => app.exit_input(),
+                    _ => {}
+                },
             },
             EventType::Tick => {}
         }

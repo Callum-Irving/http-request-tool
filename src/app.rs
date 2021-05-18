@@ -3,6 +3,7 @@ mod text_entry;
 
 use crate::{ui_graph, ui_graph::pane_identifiers::*};
 use petgraph::{graph::Graph, visit::EdgeRef};
+use serde_json::Value;
 use std::error::Error;
 use std::io::Stdout;
 use tui::{
@@ -338,30 +339,35 @@ impl App {
 
     fn send_request(&mut self) -> Result<(), Box<dyn Error>> {
         let client = reqwest::blocking::Client::new();
+
+        let body_string = self.request_widget.get_text();
+        let body_json: Value = serde_json::from_str(&body_string)?;
+
         let method = self.method_select_widget.get_current_tab();
         let res = match method.as_str() {
             "GET" => client
                 .get(self.endpoint_widget.get_text())
-                .body(self.request_widget.get_text())
+                .json(&body_json)
                 .send()?
                 .text()?,
             "POST" => client
                 .post(self.endpoint_widget.get_text())
-                .body(self.request_widget.get_text())
+                .json(&body_json)
                 .send()?
                 .text()?,
             "PUT" => client
                 .put(self.endpoint_widget.get_text())
-                .body(self.request_widget.get_text())
+                .json(&body_json)
                 .send()?
                 .text()?,
             "DELETE" => client
                 .delete(self.endpoint_widget.get_text())
-                .body(self.request_widget.get_text())
+                .json(&body_json)
                 .send()?
                 .text()?,
             _ => "".to_string(),
         };
+
         self.response_body = res;
         Ok(())
     }

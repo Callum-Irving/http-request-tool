@@ -22,15 +22,15 @@ impl TabSelect {
         }
     }
 
-    pub fn append_tab(&mut self, title: String) {
-        self.tabs.push(title);
-    }
+    //pub fn append_tab(&mut self, title: String) {
+    //self.tabs.push(title);
+    //}
 
-    pub fn remove_tab(&mut self) {
-        if self.tabs.len() > 1 {
-            self.tabs.remove(self.current_tab);
-        }
-    }
+    //pub fn remove_tab(&mut self) {
+    //if self.tabs.len() > 1 {
+    //self.tabs.remove(self.current_tab);
+    //}
+    //}
 
     pub fn move_left(&mut self) {
         self.current_tab -= (self.current_tab > 0) as usize;

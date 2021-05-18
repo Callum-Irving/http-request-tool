@@ -258,6 +258,7 @@ dependencies = [
  "crossterm",
  "petgraph",
  "reqwest",
+ "serde_json",
  "tui",
 ]
 

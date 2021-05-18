@@ -35,6 +35,10 @@ impl TextEntry {
         )
     }
 
+    pub fn get_text(&self) -> String {
+        self.text.clone()
+    }
+
     // Text entry
     pub fn input_char(&mut self, c: char) {
         // Insert the character at cursor pos

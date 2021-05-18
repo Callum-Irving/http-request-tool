@@ -94,8 +94,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     _ => {}
                 },
                 app::InputMode::EndpointEntry => match key.code {
-                    KeyCode::Esc => app.exit_input(),
-                    KeyCode::Enter => app.exit_input(),
+                    KeyCode::Esc | KeyCode::Enter => app.exit_input(),
                     KeyCode::Backspace => app.endpoint_backspace(),
                     KeyCode::Char(c) => app.endpoint_input_char(c),
                     _ => {}
@@ -105,11 +104,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                         app.exit_input();
                     }
                 }
-                app::InputMode::MethodSelect => {
-                    if key.code == KeyCode::Esc {
-                        app.exit_input();
-                    }
-                }
+                app::InputMode::MethodSelect => match key.code {
+                    KeyCode::Esc | KeyCode::Enter => app.exit_input(),
+                    KeyCode::Char('h') | KeyCode::Left => app.method_select_left(),
+                    KeyCode::Char('l') | KeyCode::Right => app.method_select_right(),
+                    _ => {}
+                },
                 app::InputMode::ResponseSelect => {
                     if key.code == KeyCode::Esc {
                         app.exit_input();

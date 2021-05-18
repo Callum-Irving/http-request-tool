@@ -1,6 +1,7 @@
+mod tab_select;
 mod text_entry;
 
-use crate::ui_graph;
+use crate::{ui_graph, ui_graph::pane_identifiers::*};
 use petgraph::{graph::Graph, visit::EdgeRef};
 use std::error::Error;
 use std::io::Stdout;
@@ -14,8 +15,7 @@ use tui::{
     Terminal,
 };
 
-use self::text_entry::TextEntry;
-use crate::ui_graph::pane_identifiers::*;
+use self::{tab_select::TabSelect, text_entry::TextEntry};
 
 #[derive(PartialEq)]
 pub enum InputMode {
@@ -37,6 +37,7 @@ pub struct App {
     ui: Graph<usize, usize>,
     endpoint_widget: TextEntry,
     request_widget: TextEntry,
+    method_select_widget: TabSelect,
     widget_styles: [Color; 8],
 }
 
@@ -55,6 +56,16 @@ impl App {
             ui: graph,
             endpoint_widget: TextEntry::new("http://".to_string(), false),
             request_widget: TextEntry::new("".to_string(), true),
+            method_select_widget: TabSelect::new(
+                vec![
+                    "GET".to_string(),
+                    "POST".to_string(),
+                    "PUT".to_string(),
+                    "DELETE".to_string(),
+                ],
+                "".to_string(),
+                Color::Magenta,
+            ),
             widget_styles,
         }
     }
@@ -121,6 +132,7 @@ impl App {
                 )
                 .divider(symbols::line::VERTICAL);
 
+            // TODO: Separate widget for body/header/query
             let request_entry = self
                 .request_widget
                 .get_widget(self.widget_styles[PANE_REQUEST_ENTRY]);
@@ -130,16 +142,9 @@ impl App {
                 .constraints([Constraint::Min(1), Constraint::Length(6)])
                 .split(request_layout[3]);
 
-            let methods = vec![
-                Spans::from("GET"),
-                Spans::from("POST"),
-                Spans::from("PUT"),
-                Spans::from("DELETE"),
-            ];
-            let method_select = Tabs::new(methods)
-                .block(Block::default().borders(Borders::ALL))
-                .style(Style::default().fg(self.widget_styles[PANE_METHOD_SELECT]))
-                .divider(symbols::line::VERTICAL);
+            let method_select = self
+                .method_select_widget
+                .get_widget(self.widget_styles[PANE_METHOD_SELECT]);
 
             let send_button = Paragraph::new(Spans::from("SEND")).block(
                 Block::default()
@@ -201,9 +206,7 @@ impl App {
 
     // Tab navigation
     pub fn tab_left(&mut self) {
-        if self.current_tab > 0 {
-            self.current_tab -= 1;
-        }
+        self.current_tab -= (self.current_tab > 0) as usize;
     }
     pub fn tab_right(&mut self) {
         self.current_tab += 1;
@@ -230,31 +233,6 @@ impl App {
 
     // Cleanly exit
     pub fn exit(&mut self) {}
-
-    // Async functions to send http requests
-    //async fn http_get(&mut self) {
-    //// Get data from text boxes
-    //let endpoint = "http://google.com/";
-    //let body = "{ json: yes }";
-
-    //// Send request
-    //let client = reqwest::Client::new();
-    //let response = client.post(endpoint).body(body).send().await;
-
-    //// Change response field
-    //match response {
-    //Ok(response) => {
-    //// Everything worked
-    //}
-    //Err(_) => {
-    //// Display error message
-    //}
-    //}
-    //}
-    //async fn http_post(&self) {}
-    //async fn http_put(&self) {}
-    //async fn http_delete(&self) {}
-    //async fn send_request(&self) {}
 }
 
 // Navigation functions
@@ -325,14 +303,7 @@ impl App {
             }
         }
 
-        // TODO: Trigger special action
-        // Actions:
-        // Tabs
-        // Endpoint entry
-        // Body/header/query tabs
-        // JSON entry
-        // Send button
-        // Method select
+        // Special actions for certain widgets
         match self.ui[self.current_pane] {
             PANE_TABS => {
                 self.input_mode = InputMode::TabSelect;
@@ -351,7 +322,7 @@ impl App {
                 self.widget_styles[self.ui[self.current_pane]] = Color::Red;
             }
             PANE_SEND_BUTTON => {
-                // Send request
+                self.send_request().unwrap();
             }
             PANE_METHOD_SELECT => {
                 self.input_mode = InputMode::MethodSelect;
@@ -363,6 +334,36 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    fn send_request(&mut self) -> Result<(), Box<dyn Error>> {
+        let client = reqwest::blocking::Client::new();
+        let method = self.method_select_widget.get_current_tab();
+        let res = match method.as_str() {
+            "GET" => client
+                .get(self.endpoint_widget.get_text())
+                .body(self.request_widget.get_text())
+                .send()?
+                .text()?,
+            "POST" => client
+                .post(self.endpoint_widget.get_text())
+                .body(self.request_widget.get_text())
+                .send()?
+                .text()?,
+            "PUT" => client
+                .put(self.endpoint_widget.get_text())
+                .body(self.request_widget.get_text())
+                .send()?
+                .text()?,
+            "DELETE" => client
+                .delete(self.endpoint_widget.get_text())
+                .body(self.request_widget.get_text())
+                .send()?
+                .text()?,
+            _ => "".to_string(),
+        };
+        self.response_body = res;
+        Ok(())
     }
 }
 
@@ -412,5 +413,16 @@ impl App {
 
     pub fn input_char(&mut self, c: char) {
         self.request_widget.input_char(c);
+    }
+}
+
+// Method select
+impl App {
+    pub fn method_select_left(&mut self) {
+        self.method_select_widget.move_left();
+    }
+
+    pub fn method_select_right(&mut self) {
+        self.method_select_widget.move_right();
     }
 }

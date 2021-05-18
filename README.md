@@ -5,3 +5,6 @@
 ![License](https://img.shields.io/github/license/Callum-Irving/http-request-tool)
 
 This is a tool for sending HTTP requests. It is meant for testing web APIs.
+
+Screenshot:
+![Screenshot](https://github.com/Callum-Irving/http-request-tool/blob/main/screenshots/screenshot.png?raw=true)
